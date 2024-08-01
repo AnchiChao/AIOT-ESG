@@ -1,0 +1,275 @@
+<html><head><base href="https://websimsolutions.com/sci-fi-linear-regression/">
+<title>Quantum Linear Regression Simulator</title>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.22.1/full/pyodide.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+    
+    body {
+        font-family: 'Orbitron', sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #000;
+        color: #0ff;
+        background-image: 
+            radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px),
+            radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 30px),
+            radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 40px),
+            radial-gradient(rgba(255,255,255,.4), rgba(255,255,255,.1) 2px, transparent 30px);
+        background-size: 550px 550px, 350px 350px, 250px 250px, 150px 150px;
+        background-position: 0 0, 40px 60px, 130px 270px, 70px 100px;
+        animation: backgroundScroll 60s linear infinite;
+    }
+
+    @keyframes backgroundScroll {
+        0% { background-position: 0 0, 40px 60px, 130px 270px, 70px 100px; }
+        100% { background-position: 550px 550px, 590px 610px, 680px 820px, 620px 650px; }
+    }
+
+    #app {
+        display: flex;
+        max-width: 1200px;
+        margin: 20px auto;
+        background-color: rgba(0, 20, 40, 0.8);
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 0 20px #0ff;
+    }
+
+    #controls { flex: 1; padding-right: 20px; }
+    #visualization { flex: 2; }
+
+    h1 {
+        color: #0ff;
+        text-shadow: 0 0 10px #0ff;
+        margin-top: 0;
+    }
+
+    .slider-container {
+        margin-bottom: 20px;
+        background: rgba(0, 255, 255, 0.1);
+        padding: 10px;
+        border-radius: 10px;
+    }
+
+    .slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 15px;
+        border-radius: 5px;
+        background: #052d2d;
+        outline: none;
+        opacity: 0.7;
+        transition: opacity .2s;
+    }
+
+    .slider:hover { opacity: 1; }
+
+    .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: #0ff;
+        cursor: pointer;
+        box-shadow: 0 0 10px #0ff;
+    }
+
+    .slider::-moz-range-thumb {
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: #0ff;
+        cursor: pointer;
+        box-shadow: 0 0 10px #0ff;
+    }
+
+    #plot {
+        width: 100%;
+        height: 500px;
+        border: 2px solid #0ff;
+        border-radius: 10px;
+        box-shadow: 0 0 15px #0ff;
+    }
+
+    #loading {
+        display: none;
+        text-align: center;
+        margin-top: 20px;
+        color: #0ff;
+        text-shadow: 0 0 10px #0ff;
+    }
+</style>
+</head>
+<body>
+<div id="app">
+    <div id="controls">
+        <h1>Quantum Linear Regression Simulator</h1>
+        <div class="slider-container">
+            <label for="a">Quantum Flux (a): </label>
+            <input type="range" id="a" class="slider" min="-50" max="50" value="1" step="0.1">
+            <span id="a-value"></span>
+        </div>
+        <div class="slider-container">
+            <label for="n">Data Points (n): </label>
+            <input type="range" id="n" class="slider" min="100" max="1000" value="500" step="10">
+            <span id="n-value"></span>
+        </div>
+        <div class="slider-container">
+            <label for="c">Entropy Factor (c): </label>
+            <input type="range" id="c" class="slider" min="10" max="100" value="50" step="1">
+            <span id="c-value"></span>
+        </div>
+        <div id="loading">Initializing Quantum Core...</div>
+    </div>
+    <div id="visualization">
+        <div id="plot"></div>
+    </div>
+</div>
+
+<script>
+const aSlider = document.getElementById('a');
+const nSlider = document.getElementById('n');
+const cSlider = document.getElementById('c');
+const aValue = document.getElementById('a-value');
+const nValue = document.getElementById('n-value');
+const cValue = document.getElementById('c-value');
+const plot = document.getElementById('plot');
+const loading = document.getElementById('loading');
+
+function updateSliderValue(slider, valueSpan) {
+    valueSpan.textContent = slider.value;
+}
+
+let pyodide;
+
+async function main() {
+    loading.style.display = 'block';
+    pyodide = await loadPyodide();
+    await pyodide.loadPackage("numpy");
+    await pyodide.loadPackage("scikit-learn");
+    loading.style.display = 'none';
+
+    pyodide.runPython(`
+        import numpy as np
+        from sklearn.linear_model import LinearRegression
+
+        def generate_quantum_data(a, n, c):
+            x = np.random.uniform(-10, 10, n)
+            y = a * x + np.random.normal(0, c, n)
+            return x, y
+
+        def perform_quantum_regression(x, y):
+            model = LinearRegression()
+            model.fit(x.reshape(-1, 1), y)
+            return model.coef_[0], model.intercept_
+    `);
+
+    updatePlot();
+}
+
+function updatePlot() {
+    const a = parseFloat(aSlider.value);
+    const n = parseInt(nSlider.value);
+    const c = parseFloat(cSlider.value);
+
+    const result = pyodide.runPython(`
+        x, y = generate_quantum_data(${a}, ${n}, ${c})
+        slope, intercept = perform_quantum_regression(x, y)
+        [x.tolist(), y.tolist(), slope, intercept]
+    `);
+
+    const [x, y, slope, intercept] = result.toJs();
+
+    const trace1 = {
+        x: x,
+        y: y,
+        mode: 'markers',
+        type: 'scatter',
+        name: 'Quantum Data Points',
+        marker: {
+            color: y,
+            colorscale: 'Viridis',
+            size: 8,
+            symbol: 'diamond',
+            line: {
+                color: '#0ff',
+                width: 1
+            }
+        }
+    };
+
+    const lineX = [Math.min(...x), Math.max(...x)];
+    const lineY = lineX.map(xi => slope * xi + intercept);
+
+    const trace2 = {
+        x: lineX,
+        y: lineY,
+        mode: 'lines',
+        type: 'scatter',
+        name: 'Quantum Regression Line',
+        line: {
+            color: '#ff00ff',
+            width: 3,
+            dash: 'dash'
+        }
+    };
+
+    const layout = {
+        title: {
+            text: 'Quantum Linear Regression Analysis',
+            font: {
+                family: 'Orbitron',
+                size: 24,
+                color: '#0ff'
+            }
+        },
+        xaxis: {
+            title: 'Quantum State',
+            gridcolor: '#0ff',
+            gridwidth: 1,
+            gridopacity: 0.3,
+            zerolinecolor: '#0ff',
+            tickfont: { family: 'Orbitron', color: '#0ff' }
+        },
+        yaxis: {
+            title: 'Observed Value',
+            gridcolor: '#0ff',
+            gridwidth: 1,
+            gridopacity: 0.3,
+            zerolinecolor: '#0ff',
+            tickfont: { family: 'Orbitron', color: '#0ff' }
+        },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,20,40,0.3)',
+        margin: {l: 50, r: 50, b: 50, t: 50, pad: 4},
+        font: { family: 'Orbitron', color: '#0ff' },
+        showlegend: false
+    };
+
+    Plotly.newPlot(plot, [trace1, trace2], layout);
+}
+
+aSlider.addEventListener('input', () => {
+    updateSliderValue(aSlider, aValue);
+    updatePlot();
+});
+
+nSlider.addEventListener('input', () => {
+    updateSliderValue(nSlider, nValue);
+    updatePlot();
+});
+
+cSlider.addEventListener('input', () => {
+    updateSliderValue(cSlider, cValue);
+    updatePlot();
+});
+
+updateSliderValue(aSlider, aValue);
+updateSliderValue(nSlider, nValue);
+updateSliderValue(cSlider, cValue);
+
+main();
+</script>
+</body></html>
